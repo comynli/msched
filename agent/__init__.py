@@ -38,9 +38,9 @@ class Agent:
             self.so.send(encode(data))
             if data.get('task') is None:
                 buf = self.so.recv(4)
-                length, _ = struct.unpack('<l', buf)
+                length, *_ = struct.unpack('<l', buf)
                 buf = self.so.recv(length)
-                data, _ = struct.unpack('<{}s'.format(length), buf)
+                data, *_ = struct.unpack('<{}s'.format(length), buf)
                 task = json.loads(data.decode())
                 cmd = Command(task)
                 future = cmd.run()
