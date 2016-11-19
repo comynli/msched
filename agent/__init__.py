@@ -5,6 +5,7 @@ import socket
 import logging
 import datetime
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from .command import Command
 
 __version__ = '0.0.1'
@@ -22,10 +23,29 @@ class Agent:
         self.tasks = {}
         self.so = None
         self.event = threading.Event()
+        self.polling = threading.Event()
+        self.executor = ThreadPoolExecutor(max_workers=1)
 
     def connect(self):
         self.so = socket.socket()
         self.so.connect(self.master)
+
+    def poll_task(self):
+        self.polling.set()
+        buf = self.so.recv(4)
+        length, *_ = struct.unpack('<l', buf)
+        buf = self.so.recv(length)
+        data, *_ = struct.unpack('<{}s'.format(length), buf)
+        task = json.loads(data.decode())
+        cmd = Command(task)
+        future = cmd.run()
+        if future is not None:
+            future.add_done_callback(self.on_task_done)
+        self.tasks['current'] = task
+
+    def on_task_done(self):
+        self.heartbeat()
+        self.tasks.pop('current', None)
 
     def heartbeat(self):
         data = {
@@ -36,17 +56,8 @@ class Agent:
         }
         try:
             self.so.send(encode(data))
-            if data.get('task') is None:
-                buf = self.so.recv(4)
-                length, *_ = struct.unpack('<l', buf)
-                buf = self.so.recv(length)
-                data, *_ = struct.unpack('<{}s'.format(length), buf)
-                task = json.loads(data.decode())
-                cmd = Command(task)
-                future = cmd.run()
-                if future is not None:
-                    future.add_done_callback(lambda: self.tasks.pop('current', None))
-                self.tasks['current'] = task
+            if data.get('task') is None and not self.polling.is_set():
+                self.executor.submit(self.poll_task).add_done_callback(lambda: self.polling.clear())
         except Exception as e:
             logging.error('send heartbeat error: {}'.format(e))
             self.connect()
