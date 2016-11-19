@@ -31,7 +31,7 @@ class MasterHandler(BaseRequestHandler):
         tx.set_data('/{}/tasks/{}/targets/{}'.format(self.server.root, task_id, agent_id), status.encode())
         if status in ('F', 'S', 'K'):
             tx.delete('/{}/agents/{}/tasks/{}'.format(self.server.root, agent_id, task_id))
-        tx.set_data('/{}/signal/{}', uuid.uuid4().bytes)
+        tx.set_data('/{}/signal/{}'.format(self.server.root, task_id), uuid.uuid4().bytes)
         tx.commit()
 
     def handle(self):
