@@ -1,3 +1,4 @@
+import os
 import json
 import struct
 import socket
@@ -28,6 +29,7 @@ class Agent:
 
     def heartbeat(self):
         data = {
+            'id': os.uname().nodename,
             'version': __version__,
             'timestamp': datetime.datetime.now().timestamp(),
             'task': self.tasks.get('current')
